@@ -28,3 +28,9 @@ to the original (though less than the current implementation).
 Twitter selected 1ms as the time period to bucket new keys into. On server machines
 it can be hard to get a reliable clock source that has a higher frequency than 1ms
 so this is a good starting point.
+
+## TODO
+
+* remove sleep on fail, make it just pass back the exhaustion flag
+* write a strategy
+* write a high speed test

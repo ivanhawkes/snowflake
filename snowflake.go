@@ -61,10 +61,15 @@ const (
 	timestampBitLength = 37
 
 	// The remaining bits make up the thread ID.
-	threadBitLength = 19
+	//	threadBitLength = 19
+	threadBitLength = 24
 
 	// The number of bits allocated to the sequence number.
 	sequenceBitLength = 63 - timestampBitLength - threadBitLength
+
+	// A bitmask for the sequence bits. This is also the largest unsigned
+	// integer the sequence can represent.
+	sequenceMask = 1<<sequenceBitLength - 1
 )
 
 type Snowflake struct {
@@ -94,8 +99,7 @@ type Snowflake struct {
 }
 
 var (
-	ErrEpochAhead    = errors.New("Epoch is ahead of now ()")
-	ErrOverTimeLimit = errors.New("Exceeded the time limit")
+	ErrEpochAhead = errors.New("Epoch is ahead of now ()")
 )
 
 // Returns a new Snowflake with values computed from the arguments
@@ -107,7 +111,7 @@ func New(Epoch time.Time, ThreadID uint32) (*Snowflake, error) {
 	}
 
 	sf := new(Snowflake)
-	sf.sequence = 1<<sequenceBitLength - 1
+	sf.sequence = sequenceMask
 	sf.isExhausted = false
 
 	if Epoch.IsZero() {
@@ -121,10 +125,20 @@ func New(Epoch time.Time, ThreadID uint32) (*Snowflake, error) {
 	return sf, nil
 }
 
-// NextID generates the next unique ID.
-func (sf *Snowflake) NextID() (uint64, bool, error) {
-	const maskSequence = 1<<sequenceBitLength - 1
+// This snowflake is being assigned a new ThreadID, possibly due to
+// exhaustion of the sequence.
+func (sf *Snowflake) ResetID(ThreadID uint32) uint32 {
+	originalID := sf.threadID
 
+	sf.threadID = ThreadID
+	sf.sequence = sequenceMask
+	sf.isExhausted = false
+
+	return originalID
+}
+
+// NextID generates the next unique ID.
+func (sf *Snowflake) NextID() (uint64, bool) {
 	// We need to lock this routine to make the changes atomically because
 	// there is a chance of multiple goroutines using the same instance
 	// of snowflake.
@@ -134,24 +148,24 @@ func (sf *Snowflake) NextID() (uint64, bool, error) {
 	currentTimestamp := currentElapsedTime(sf.epoch)
 
 	// Has the timestamp changed.
-	if currentTimestamp >= sf.lastTimestamp {
+	if currentTimestamp > sf.lastTimestamp {
 		// Yes. Roll over to the new timestamp and reset the sequence.
 		sf.lastTimestamp = currentTimestamp
 		sf.sequence = 0
 		sf.isExhausted = false
 	} else {
 		// No. Increment the sequence counter.
-		sf.sequence = (sf.sequence + 1) & maskSequence
+		sf.sequence = (sf.sequence + 1) & sequenceMask
 
 		// Check if the counter is now exhausted.
-		if sf.sequence == maskSequence {
+		if sf.sequence == sequenceMask {
 			sf.isExhausted = true
 		}
 	}
 
-	id, err := sf.toID()
+	id := sf.toID()
 
-	return id, sf.isExhausted, err
+	return id, sf.isExhausted
 }
 
 func toSnowflakeTime(t time.Time) int64 {
@@ -162,24 +176,20 @@ func currentElapsedTime(epoch int64) int64 {
 	return toSnowflakeTime(time.Now()) - epoch
 }
 
-func (sf *Snowflake) toID() (uint64, error) {
-	if sf.lastTimestamp >= 1<<timestampBitLength {
-		return 0, ErrOverTimeLimit
-	}
-
+func (sf *Snowflake) toID() uint64 {
 	return uint64(sf.lastTimestamp)<<(threadBitLength+sequenceBitLength) |
 		uint64(sf.sequence)<<threadBitLength |
-		uint64(sf.threadID), nil
+		uint64(sf.threadID)
 }
 
 func ElapsedTime(id uint64) time.Duration {
-	return time.Duration(timeStamp(id) * timeUnit)
+	return time.Duration(TimeStamp(id) * timeUnit)
 }
 
 func SequenceNumber(id uint64) uint64 {
-	const maskSequence = uint64((1<<sequenceBitLength - 1) << threadBitLength)
+	const mask = uint64(sequenceMask << threadBitLength)
 
-	return id & maskSequence >> threadBitLength
+	return id & mask >> threadBitLength
 }
 
 func ThreadID(id uint64) uint64 {
@@ -188,6 +198,6 @@ func ThreadID(id uint64) uint64 {
 	return id & maskThreadID
 }
 
-func timeStamp(id uint64) uint64 {
+func TimeStamp(id uint64) uint64 {
 	return id >> (threadBitLength + sequenceBitLength)
 }

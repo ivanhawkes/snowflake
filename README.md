@@ -31,6 +31,5 @@ so this is a good starting point.
 
 ## TODO
 
-* remove sleep on fail, make it just pass back the exhaustion flag
 * write a strategy
 * write a high speed test

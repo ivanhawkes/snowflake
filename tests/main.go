@@ -24,8 +24,20 @@ func main() {
 	fmt.Printf("Epoch: %v\n", epoch)
 
 	for i := 0; i < 16; i++ {
+		// DEBUG: waste some time so we can test the timestamp bucketing.
+		//time.Sleep(1000000)
+
+		// Get the next ID available.
 		id, isExhausted := sf.NextID()
-		m[id] = id
+
+		// Store it in a map for debugging purposes.
+		//m[id] = id
+		_, exists := m[id]
+		if !exists {
+			m[id] = id
+		} else {
+			fmt.Printf("--- CONFLICT ON %d, %d ---", id, m[id])
+		}
 
 		// Check if the range of the sequence is exhausted.
 		if isExhausted {

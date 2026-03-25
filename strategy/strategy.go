@@ -104,7 +104,7 @@ func NewStrategy(Epoch time.Time, poolMinimum int, poolMaximum int) (*Strategy, 
 
 func (st *Strategy) NextID() uint64 {
 	// DEBUG: waste some time so we can test the timestamp bucketing.
-	time.Sleep(1000)
+	//time.Sleep(1000)
 
 	// Get the next ID available.
 	id, isExhausted := st.snowflake.NextID()

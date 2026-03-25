@@ -23,6 +23,9 @@ func main() {
 	fmt.Printf("Epoch: %v\n", epoch)
 
 	for i := 0; i < 8192; i++ {
+		// DEBUG: waste some time so we can test the timestamp bucketing.
+		time.Sleep(time.Microsecond)
+
 		id := st.NextID()
 		// Store it in a map for debugging purposes.
 		_, exists := m[id]

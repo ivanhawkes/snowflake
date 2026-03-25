@@ -72,9 +72,6 @@ const (
 )
 
 type Snowflake struct {
-	// Lock mechanism to make increments atomic.
-	mutex sync.Mutex
-
 	// The date from which all timestamp offsets are measured.
 	epoch int64
 
@@ -141,8 +138,10 @@ func (sf *Snowflake) NextID() (uint64, bool) {
 	// We need to lock this routine to make the changes atomically because
 	// there is a chance of multiple goroutines using the same instance
 	// of snowflake.
-	sf.mutex.Lock()
-	defer sf.mutex.Unlock()
+	// Lock mechanism to make increments atomic.
+	mutex := sync.Mutex{}
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	currentTimestamp := currentElapsedTime(sf.epoch)
 

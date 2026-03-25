@@ -15,7 +15,7 @@ func main() {
 	m := make(threadIDMapType)
 
 	epoch := time.Time{}
-	st, err := strategy.NewStrategy(epoch)
+	st, err := strategy.NewStrategy(epoch, 0, 63)
 	if err != nil {
 		fmt.Println("Failed to create a snowflake strategy.")
 	}

@@ -43,11 +43,6 @@ func (st *Strategy) GetStatistics() Statistics {
 
 func (st *Strategy) PrintStatistics() {
 	// Debug.
-	fmt.Printf("ID COUNT: %d\n", st.idCount)
-	fmt.Printf("THREAD ID: %d\n", st.threadID)
-	fmt.Printf("EXHAUSTION MAX: %d\n", st.exhaustedMax)
-
-	// Debug.
 	fmt.Printf("EXHAUSTED QUEUE: %d\n", len(st.exhaustedQueue))
 	for i, value := range st.exhaustedQueue {
 		fmt.Printf("queue: %d\t%d\n", i, value)
@@ -58,6 +53,11 @@ func (st *Strategy) PrintStatistics() {
 	for i, value := range st.reserveQueue {
 		fmt.Printf("queue: %d\t%d\n", i, value)
 	}
+
+	// Debug.
+	fmt.Printf("\nID COUNT: %d\n", st.idCount)
+	fmt.Printf("THREAD ID: %d\n", st.threadID)
+	fmt.Printf("EXHAUSTION MAX: %d\n", st.exhaustedMax)
 }
 
 func enqueue(queue []uint32, element uint32) []uint32 {
@@ -76,7 +76,7 @@ func dequeue(queue []uint32) ([]uint32, uint32) {
 	return queue[1:], element
 }
 
-func NewStrategy(Epoch time.Time) (*Strategy, error) {
+func NewStrategy(Epoch time.Time, poolMinimum int, poolMaximum int) (*Strategy, error) {
 	st := new(Strategy{
 		threadID:           0,
 		wasExhausted:       false,
@@ -87,7 +87,7 @@ func NewStrategy(Epoch time.Time) (*Strategy, error) {
 		idCount:            0})
 
 	// Create a pool of IDS to hold in reserve.
-	for range 64 {
+	for i := poolMinimum; i <= poolMaximum; i++ {
 		st.reserveQueue = append(st.reserveQueue, st.threadID)
 		st.threadID++
 	}
@@ -137,7 +137,6 @@ func (st *Strategy) NextID() uint64 {
 		st.reserveQueue, st.threadID = dequeue(st.reserveQueue)
 		previousID := st.snowflake.ResetID(st.threadID)
 		st.exhaustedTimestamp = snowflake.TimeStamp(id)
-		fmt.Printf("\nEXHAUSTED: previousID=%d, threadID = %d\n", previousID, st.threadID)
 		isExhausted = false
 		st.wasExhausted = true
 
@@ -148,7 +147,6 @@ func (st *Strategy) NextID() uint64 {
 
 		// Need to add any ID that's not the original one to a pool
 		// of exhausted IDs for later recovery.
-		fmt.Printf("Queue Exhausted: %d\n", previousID)
 		st.exhaustedQueue = enqueue(st.exhaustedQueue, previousID)
 	}
 

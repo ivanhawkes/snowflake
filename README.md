@@ -31,5 +31,4 @@ so this is a good starting point.
 
 ## TODO
 
-* write a strategy
-* write a high speed test
+* allow the pool size to be set from the strategy creation function

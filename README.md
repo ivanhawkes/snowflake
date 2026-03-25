@@ -31,4 +31,4 @@ so this is a good starting point.
 
 ## TODO
 
-* allow the pool size to be set from the strategy creation function
+* run multiple strategies at once on goroutines

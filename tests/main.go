@@ -22,7 +22,7 @@ func main() {
 
 	fmt.Printf("Epoch: %v\n", epoch)
 
-	for i := 0; i < 16000; i++ {
+	for i := 0; i < 8192; i++ {
 		id := st.NextID()
 		// Store it in a map for debugging purposes.
 		_, exists := m[id]

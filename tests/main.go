@@ -2,46 +2,47 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"ivanhawkes.dev/snowflake"
 )
 
+type threadIDMapType map[uint64]uint64
+type reservePoolType []uint32
+
 func enqueue(queue []uint32, element uint32) []uint32 {
 	queue = append(queue, element)
-	fmt.Printf("Enqueued: %d \n", element)
+	fmt.Printf("Enqueue: %d \n", element)
 
 	return queue
 }
 
-func dequeueAll(queue []uint32) []uint32 {
-	for i := len(queue) - 1; i >= 0; i-- {
-		threadID := queue[i]
-		fmt.Printf("Dequeue: %d\n", threadID)
-	}
+func dequeue(queue []uint32) ([]uint32, uint32) {
+	element := queue[0]
+	fmt.Printf("Dequeue: %d \n", element)
 
-	return queue[0:0]
+	return queue[1:], element
 }
 
 func main() {
 	var threadID uint32 = 0
 	var wasExhausted bool = false
 	var exhaustedTimestamp uint64 = 0
-	var exhaustedLIFO []uint32
+	var reserveQueue = make(reservePoolType, 0, 64)
+	var exhaustedQueue = make(reservePoolType, 0, 64)
 
 	// By inserting the values into a map we can easily check for duplicates.
-	m := make(map[uint64]uint64)
+	m := make(threadIDMapType)
 
 	// Create a pool of IDS to hold in reserve.
-	reservePool := make(map[uint64]uint64)
-	for i := 0; i < 64; i++ {
-		reservePool[uint64(threadID)] = uint64(threadID)
+	for range 64 {
+		reserveQueue = append(reserveQueue, threadID)
 		threadID++
 	}
 
-	// Keep a copy of the original ID so we can return to that value
-	// when the rush is over.
-	originalID := threadID
+	// Get an initial threadID.
+	reserveQueue, threadID = dequeue(reserveQueue)
 
 	// Track all the IDs that have been used from the pool.
 	epoch := time.Time{}
@@ -52,9 +53,9 @@ func main() {
 
 	fmt.Printf("Epoch: %v\n", epoch)
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 100; i++ {
 		// DEBUG: waste some time so we can test the timestamp bucketing.
-		time.Sleep(1000000)
+		time.Sleep(75000)
 
 		// Get the next ID available.
 		id, isExhausted := sf.NextID()
@@ -65,10 +66,22 @@ func main() {
 				fmt.Println("RECOVERY")
 
 				// All the exhausted ThreadIDs can return to the pool we use.
-				if len(exhaustedLIFO) > 0 {
+				if len(exhaustedQueue) > 0 {
 					fmt.Println("DEQUEUE")
-					exhaustedLIFO = dequeueAll(exhaustedLIFO)
-					sf.ResetID(originalID)
+
+					// Copy the exhausted list back to our pool.
+					for _, value := range exhaustedQueue {
+						fmt.Printf("Copy: %d\n", value)
+						reserveQueue = enqueue(reserveQueue, value)
+					}
+					slices.Sort(reserveQueue)
+
+					// Empty the exhausted LIFO.
+					exhaustedQueue = exhaustedQueue[0:0]
+
+					// Take a new threadID from the top of the queue.
+					// reserveQueue, threadID = dequeue(reserveQueue)
+					// sf.ResetID(threadID)
 				}
 
 				// Mark this phase as completed.
@@ -87,28 +100,19 @@ func main() {
 
 		// Check if the range of the sequence is exhausted.
 		if isExhausted {
-			// Has our clock ticked us on to a new timestamp?
-			// if exhaustedTimestamp < snowflake.TimeStamp(id) {
-			// 	// The timestamp rolled over, so there is no need to take any action.
-			// 	exhaustedTimestamp = 0
-			// 	isExhausted = false
-			// } else {
-
 			// We requested a new ID before the timestamp rolled over. We need a
 			// new ThreadID to avoid conflicts.
-			threadID++
+			reserveQueue, threadID = dequeue(reserveQueue)
 			previousID := sf.ResetID(threadID)
 			exhaustedTimestamp = snowflake.TimeStamp(id)
-			fmt.Printf("\nEXHAUSTED: i= %d, oldID=%d, threadID = %d", i, originalID, threadID)
+			fmt.Printf("\nEXHAUSTED: i= %d, previousID=%d, threadID = %d\n", i, previousID, threadID)
 			isExhausted = false
 			wasExhausted = true
 
 			// Need to add any ID that's not the original one to a pool
 			// of exhausted IDs for later recovery.
-			if previousID != originalID {
-				exhaustedLIFO = enqueue(exhaustedLIFO, previousID)
-			}
-			// }
+			fmt.Printf("Queue Exhausted: %d\n", previousID)
+			exhaustedQueue = enqueue(exhaustedQueue, previousID)
 		} else {
 
 		}
@@ -120,4 +124,24 @@ func main() {
 			fmt.Printf("ThreadID: %d\tSequenceNumber: %d\n", snowflake.ThreadID(id), snowflake.SequenceNumber(id))
 		}
 	}
+
+	// Debug.
+	fmt.Printf("THREAD ID: %d\n", threadID)
+
+	// Debug.
+	slices.Sort(exhaustedQueue)
+	fmt.Printf("EXHAUSTED QUEUE: %d\n", len(exhaustedQueue))
+	for i, value := range exhaustedQueue {
+		fmt.Printf("queue: %d\t%d\n", i, value)
+	}
+
+	// Debug.
+	slices.Sort(reserveQueue)
+	fmt.Printf("RESERVE QUEUE: %d\n", len(reserveQueue))
+	for i, value := range reserveQueue {
+		if i < 10 {
+			fmt.Printf("queue: %d\t%d\n", i, value)
+		}
+	}
+
 }

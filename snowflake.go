@@ -61,8 +61,7 @@ const (
 	timestampBitLength = 37
 
 	// The remaining bits make up the thread ID.
-	//	threadBitLength = 19
-	threadBitLength = 24
+	threadBitLength = 19
 
 	// The number of bits allocated to the sequence number.
 	sequenceBitLength = 63 - timestampBitLength - threadBitLength

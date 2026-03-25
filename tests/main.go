@@ -57,9 +57,9 @@ func main() {
 
 	fmt.Printf("Epoch: %v\n", epoch)
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 16000; i++ {
 		// DEBUG: waste some time so we can test the timestamp bucketing.
-		time.Sleep(1800)
+		time.Sleep(1000)
 
 		// Get the next ID available.
 		id, isExhausted := sf.NextID()
@@ -113,12 +113,9 @@ func main() {
 			// of exhausted IDs for later recovery.
 			fmt.Printf("Queue Exhausted: %d\n", previousID)
 			exhaustedQueue = enqueue(exhaustedQueue, previousID)
-		} else {
-
 		}
 
-		/*if i%8 == 0 || i%8 == 7 || isExhausted*/
-		{
+		if i%127 == 0 || isExhausted {
 			fmt.Printf("\ni: %d,\tmap size: %d\n", i, len(m))
 			fmt.Printf("NextId: %d\tTimeStamp: %d\n", id, snowflake.TimeStamp(id))
 			fmt.Printf("ThreadID: %d\tSequenceNumber: %d\n", snowflake.ThreadID(id), snowflake.SequenceNumber(id))
@@ -144,5 +141,4 @@ func main() {
 			fmt.Printf("queue: %d\t%d\n", i, value)
 		}
 	}
-
 }

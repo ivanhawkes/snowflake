@@ -2,11 +2,11 @@ package strategy
 
 import (
 	"fmt"
-	"log"
 	"slices"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"ivanhawkes.dev/snowflake"
 )
 
@@ -29,6 +29,7 @@ type Strategy struct {
 	wasExhausted       bool
 	exhaustedTimestamp uint64
 	idCount            uint64
+	zl                 *zap.Logger
 	mutex              sync.Mutex
 }
 
@@ -77,9 +78,9 @@ func enqueue(queue []uint32, element uint32) []uint32 {
 	return queue
 }
 
-func dequeue(queue []uint32) ([]uint32, uint32) {
+func dequeue(queue []uint32, zl *zap.Logger) ([]uint32, uint32) {
 	if len(queue) == 0 {
-		log.Fatal("--- RESERVE THREAD IDs COMPLETELY EXHAUSTED ---")
+		zl.Fatal("Reserve thread IDs are completely exhausted.")
 	}
 
 	element := queue[0]
@@ -88,7 +89,9 @@ func dequeue(queue []uint32) ([]uint32, uint32) {
 }
 
 // Create a new pool of strategies which can be used to allocate IDs.
-func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, ReservedPerPool uint32) (*StrategyPool, error) {
+func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, ReservedPerPool uint32, ZL *zap.Logger) (*StrategyPool, error) {
+	ZL.Info("Creating a new strategy pool.")
+
 	// Make a new pool and set the index and counter.
 	sp := StrategyPool{}
 	sp.poolIndex = EntryCount - 1
@@ -100,9 +103,9 @@ func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, Reser
 		end := PoolStart + (i+1)*ReservedPerPool - 1
 
 		// Add a strategy for each entry.
-		st, err := NewStrategy(Epoch, start, end)
+		st, err := NewStrategy(Epoch, start, end, ZL)
 		if err != nil {
-			log.Fatal("Failed to create a strategy pool.")
+			ZL.Fatal("Failed to create a strategy pool.")
 			return &sp, err
 		}
 		sp.Pool = append(sp.Pool, st)
@@ -128,7 +131,7 @@ func (sp *StrategyPool) Next() *Strategy {
 
 // Create a new instance of a strategy.
 // Not thread-safe.
-func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32) (*Strategy, error) {
+func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32, ZL *zap.Logger) (*Strategy, error) {
 	entries := PoolMaximum - PoolMinimum + 1
 
 	st := new(Strategy{
@@ -138,7 +141,8 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32) (*Stra
 		reserveQueue:       make(reservePoolType, 0, entries),
 		exhaustedQueue:     make(reservePoolType, 0, entries),
 		exhaustedMax:       0,
-		idCount:            0})
+		idCount:            0,
+		zl:                 ZL})
 
 	// Create a pool of IDS to hold in reserve.
 	for i := PoolMinimum; i <= PoolMaximum; i++ {
@@ -146,7 +150,7 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32) (*Stra
 	}
 
 	// Get an initial threadID.
-	st.reserveQueue, st.threadID = dequeue(st.reserveQueue)
+	st.reserveQueue, st.threadID = dequeue(st.reserveQueue, st.zl)
 
 	// Make a new snowflake to use.
 	sf, err := snowflake.New(Epoch, st.threadID)
@@ -192,7 +196,7 @@ func (st *Strategy) NextID() uint64 {
 	if isExhausted {
 		// We requested a new ID before the timestamp rolled over. We need a
 		// new ThreadID to avoid conflicts.
-		st.reserveQueue, st.threadID = dequeue(st.reserveQueue)
+		st.reserveQueue, st.threadID = dequeue(st.reserveQueue, st.zl)
 		previousID := st.snowflake.ResetID(st.threadID)
 		st.exhaustedTimestamp = snowflake.TimeStamp(id)
 		isExhausted = false

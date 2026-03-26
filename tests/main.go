@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"ivanhawkes.dev/snowflake/strategy"
 )
 
@@ -35,12 +35,12 @@ func (sm *SafeMap) Set(key uint64) {
 
 var m SafeMap
 
-func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup) {
+func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup, ZL *zap.Logger) {
 	defer wg.Done()
 
 	for i := 0; i < count; i++ {
 		// DEBUG: waste some time so we can test the timestamp bucketing.
-		time.Sleep(time.Microsecond * 10)
+		time.Sleep(time.Microsecond * 1)
 
 		// Round robin the strategies.
 		st := sp.Next()
@@ -52,13 +52,17 @@ func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup) {
 		if !m.Exists(id) {
 			m.Set(id)
 		} else {
-			log.Fatal("--- THREAD ID CONFLICT ---")
+			ZL.Fatal("Thread ID already exists.", zap.Uint64("id", id))
 		}
 	}
 }
 
 func main() {
 	start := time.Now()
+
+	// Provide a logging solution.
+	zl, _ := zap.NewProduction()
+	defer zl.Sync()
 
 	var wg sync.WaitGroup
 
@@ -69,9 +73,9 @@ func main() {
 	epoch := time.Time{}
 
 	// Create a pool of strategies to work with.
-	sp, err := strategy.NewStrategyPool(epoch, 8, 0, 16)
+	sp, err := strategy.NewStrategyPool(epoch, 24, 0, 16, zl)
 	if err != nil {
-		log.Fatal("Failed to create a snowflake strategy.")
+		zl.Fatal("Failed to create a snowflake strategy pool.")
 	}
 
 	// Let them know which epoch is in use.
@@ -80,7 +84,7 @@ func main() {
 	// // Fire up a bunch of goroutines to churn out IDs.
 	for range 24 {
 		wg.Add(1)
-		go burnID(8192, sp, &wg)
+		go burnID(8192, sp, &wg, zl)
 	}
 
 	// Wait for them to all finish.
@@ -96,5 +100,5 @@ func main() {
 	}
 
 	// How many, how fast.
-	fmt.Printf("\n\nTOTAL: %d IDs created in %v\n", len(m.m), end.Sub(start))
+	fmt.Printf("\nTOTAL: %d IDs created in %v\n", len(m.m), end.Sub(start))
 }

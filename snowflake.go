@@ -92,6 +92,10 @@ type Snowflake struct {
 	// completely exhauted. The calling program will need to take
 	// mitigation steps.
 	isExhausted bool
+
+	// A mutex will let us lock the instance of snowflake while goroutines
+	// execute code that is not thread safe.
+	mutex sync.Mutex
 }
 
 var (
@@ -124,6 +128,9 @@ func New(Epoch time.Time, ThreadID uint32) (*Snowflake, error) {
 // This snowflake is being assigned a new ThreadID, possibly due to
 // exhaustion of the sequence.
 func (sf *Snowflake) ResetID(ThreadID uint32) uint32 {
+	sf.mutex.Lock()
+	defer sf.mutex.Unlock()
+
 	originalID := sf.threadID
 
 	sf.threadID = ThreadID
@@ -135,13 +142,8 @@ func (sf *Snowflake) ResetID(ThreadID uint32) uint32 {
 
 // NextID generates the next unique ID.
 func (sf *Snowflake) NextID() (uint64, bool) {
-	// We need to lock this routine to make the changes atomically because
-	// there is a chance of multiple goroutines using the same instance
-	// of snowflake.
-	// Lock mechanism to make increments atomic.
-	mutex := sync.Mutex{}
-	mutex.Lock()
-	defer mutex.Unlock()
+	sf.mutex.Lock()
+	defer sf.mutex.Unlock()
 
 	currentTimestamp := currentElapsedTime(sf.epoch)
 
@@ -158,6 +160,7 @@ func (sf *Snowflake) NextID() (uint64, bool) {
 		// Check if the counter is now exhausted.
 		if sf.sequence == sequenceMask {
 			sf.isExhausted = true
+			println("exhausted")
 		}
 	}
 

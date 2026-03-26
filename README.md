@@ -31,4 +31,4 @@ so this is a good starting point.
 
 ## TODO
 
-* run multiple strategies at once on goroutines
+* Logging

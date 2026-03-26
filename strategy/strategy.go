@@ -17,6 +17,7 @@ type StrategyPool struct {
 	Pool      strategyPoolListType
 	length    uint32
 	poolIndex uint32
+	mutex     sync.Mutex
 }
 
 type Strategy struct {
@@ -28,6 +29,7 @@ type Strategy struct {
 	wasExhausted       bool
 	exhaustedTimestamp uint64
 	idCount            uint64
+	mutex              sync.Mutex
 }
 
 type Statistics struct {
@@ -49,6 +51,7 @@ func (st *Strategy) GetStatistics() Statistics {
 	return stats
 }
 
+// Print out some of the statistics to the console.
 func (st *Strategy) PrintStatistics() {
 	// Debug.
 	fmt.Printf("EXHAUSTED QUEUE: %d\n", len(st.exhaustedQueue))
@@ -84,7 +87,8 @@ func dequeue(queue []uint32) ([]uint32, uint32) {
 	return queue[1:], element
 }
 
-func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, ReservedPerPool uint32) (StrategyPool, error) {
+// Create a new pool of strategies which can be used to allocate IDs.
+func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, ReservedPerPool uint32) (*StrategyPool, error) {
 	// Make a new pool and set the index and counter.
 	sp := StrategyPool{}
 	sp.poolIndex = EntryCount - 1
@@ -98,16 +102,21 @@ func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, Reser
 		// Add a strategy for each entry.
 		st, err := NewStrategy(Epoch, start, end)
 		if err != nil {
-			fmt.Println("Failed to create a strategy pool.")
-			return sp, err
+			log.Fatal("Failed to create a strategy pool.")
+			return &sp, err
 		}
 		sp.Pool = append(sp.Pool, st)
 	}
 
-	return sp, nil
+	return &sp, nil
 }
 
+// Requests the next strategy instance from the pool. These are
+// doled out using a round robin method.
 func (sp *StrategyPool) Next() *Strategy {
+	sp.mutex.Lock()
+	defer sp.mutex.Unlock()
+
 	// Round robin.
 	sp.poolIndex++
 	if sp.poolIndex >= sp.length {
@@ -117,6 +126,8 @@ func (sp *StrategyPool) Next() *Strategy {
 	return sp.Pool[sp.poolIndex]
 }
 
+// Create a new instance of a strategy.
+// Not thread-safe.
 func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32) (*Strategy, error) {
 	entries := PoolMaximum - PoolMinimum + 1
 
@@ -144,14 +155,14 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32) (*Stra
 	return st, err
 }
 
+// Use a strategy to get a unique identifier. This function is thread-safe.
 func (st *Strategy) NextID() uint64 {
 	// Placing a mutex on this entire function will allow multiple
 	// clients to share the same strategy. You can comment this out
 	// if you're sure each execution thread / goroutine will have
 	// it's own strategy instance.
-	mutex := sync.Mutex{}
-	mutex.Lock()
-	defer mutex.Unlock()
+	st.mutex.Lock()
+	defer st.mutex.Unlock()
 
 	// Get the next ID available.
 	id, isExhausted := st.snowflake.NextID()

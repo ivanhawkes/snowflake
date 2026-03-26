@@ -160,7 +160,6 @@ func (sf *Snowflake) NextID() (uint64, bool) {
 		// Check if the counter is now exhausted.
 		if sf.sequence == sequenceMask {
 			sf.isExhausted = true
-			println("exhausted")
 		}
 	}
 

@@ -40,7 +40,7 @@ func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup) {
 
 	for i := 0; i < count; i++ {
 		// DEBUG: waste some time so we can test the timestamp bucketing.
-		time.Sleep(time.Microsecond * 1)
+		time.Sleep(time.Microsecond * 10)
 
 		// Round robin the strategies.
 		st := sp.Next()
@@ -58,6 +58,8 @@ func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup) {
 }
 
 func main() {
+	start := time.Now()
+
 	var wg sync.WaitGroup
 
 	// By inserting the values into a map we can easily check for duplicates.
@@ -78,11 +80,13 @@ func main() {
 	// // Fire up a bunch of goroutines to churn out IDs.
 	for range 24 {
 		wg.Add(1)
-		go burnID(1000, sp, &wg)
+		go burnID(8192, sp, &wg)
 	}
 
 	// Wait for them to all finish.
 	wg.Wait()
+
+	end := time.Now()
 
 	// Print out the statistics for the run.
 	var total int = 0
@@ -90,5 +94,7 @@ func main() {
 		st.PrintStatistics()
 		total += int(st.GetStatistics().IdCount)
 	}
-	fmt.Printf("\n\nTOTAL: %d\n", len(m.m))
+
+	// How many, how fast.
+	fmt.Printf("\n\nTOTAL: %d IDs created in %v\n", len(m.m), end.Sub(start))
 }

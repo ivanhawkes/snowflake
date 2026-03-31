@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ivanhawkes/snowflake"
 	"go.uber.org/zap"
-	"ivanhawkes.dev/snowflake"
 )
 
 type reservePoolType []uint32

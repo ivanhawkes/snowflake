@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ivanhawkes/snowflake/strategy"
 	"go.uber.org/zap"
-	"ivanhawkes.dev/snowflake/strategy"
 )
 
 type threadIDMapType map[uint64]uint64

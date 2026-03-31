@@ -1,4 +1,4 @@
-module ivanhawkes.dev/snowflake
+module github.com/ivanhawkes/snowflake
 
 go 1.26.1
 

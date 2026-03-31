@@ -14,6 +14,56 @@ off some longevity for higher throughput under even highly parallel loads.
 
 It is perfectly capable of creating millions of IDs per second if needed.
 
+## Quickstart
+
+To use snowflake you just need to import the library to your project.
+
+```bash
+go get github.com/ivanhawkes/snowflake
+```
+
+Now you can reference the packages in your import statements. You would
+typically import the strategy, rather than the bare snowflake code.
+
+```go
+import (
+	"github.com/ivanhawkes/snowflake/strategy"
+)
+```
+
+Create a pool to use.
+
+```go
+	// Set the epoch to zero, the built-in default value will be used.
+	epoch := time.Time{}
+
+	// Create a pool of strategies to work with.
+	sp, err := strategy.NewStrategyPool(epoch, 24, 0, 16, zl)
+	if err != nil {
+		zl.Fatal("Failed to create a snowflake strategy pool.")
+	}
+```
+
+Pass in the epoch, number of pool entries, the starting entry value,
+the number of thread IDs to reserve for each entry, and a Zap logger.
+
+You can now use it by simple requesting the next ID from the strategy
+whenever you need a new ID.
+
+NOTE: it is best to use the pool in a round robin fashion or some form
+of randomised or load balanced method. This spreads the load over the
+entire pool, rather than hitting the same entry over and over.
+
+```go
+    // Round robin the strategies.
+    st := sp.Next()
+
+    // Get the next snowflake.
+    id := st.NextID()
+```
+
+Check the *_tests/main.go_* code for a full example.
+
 ## The Algorithm
 
 The original Twitter algorithm used a 64 bit unsigned integer. By breaking

@@ -71,7 +71,7 @@ const (
 	sequenceMask = 1<<sequenceBitLength - 1
 )
 
-type Snowflake struct {
+type Snowmachine struct {
 	// The date from which all timestamp offsets are measured.
 	epoch int64
 
@@ -84,7 +84,7 @@ type Snowflake struct {
 	sequence uint32
 
 	// An ID that is unique for every thread on every machine in the cluster.
-	// While it's possible to share a snowflake between threads, best practice
+	// While it's possible to share a snow machine between threads, best practice
 	// is for each thread / coroutine to have it's own ThreadID.
 	threadID uint32
 
@@ -93,7 +93,7 @@ type Snowflake struct {
 	// mitigation steps.
 	isExhausted bool
 
-	// A mutex will let us lock the instance of snowflake while goroutines
+	// A mutex will let us lock the instance of snow machine while goroutines
 	// execute code that is not thread safe.
 	mutex sync.Mutex
 }
@@ -102,70 +102,70 @@ var (
 	ErrEpochAhead = errors.New("Epoch is ahead of now ()")
 )
 
-// Returns a new Snowflake with values computed from the arguments
+// Returns a new Snow machine with values computed from the arguments
 // and it's constant constraints.
 // Errors: Epoch is ahead of the current time.
-func New(Epoch time.Time, ThreadID uint32) (*Snowflake, error) {
+func New(Epoch time.Time, ThreadID uint32) (*Snowmachine, error) {
 	if Epoch.After(time.Now()) {
 		return nil, ErrEpochAhead
 	}
 
-	sf := new(Snowflake)
-	sf.sequence = sequenceMask
-	sf.isExhausted = false
+	sm := new(Snowmachine)
+	sm.sequence = sequenceMask
+	sm.isExhausted = false
 
 	if Epoch.IsZero() {
-		sf.epoch = toSnowflakeTime(time.Date(epochYear, epochMonth, epochDay, 0, 0, 0, 0, time.UTC))
+		sm.epoch = toSnowflakeTime(time.Date(epochYear, epochMonth, epochDay, 0, 0, 0, 0, time.UTC))
 	} else {
-		sf.epoch = toSnowflakeTime(Epoch)
+		sm.epoch = toSnowflakeTime(Epoch)
 	}
 
-	sf.threadID = ThreadID
+	sm.threadID = ThreadID
 
-	return sf, nil
+	return sm, nil
 }
 
-// This snowflake is being assigned a new ThreadID, possibly due to
+// This snow machine is being assigned a new ThreadID, possibly due to
 // exhaustion of the sequence.
-func (sf *Snowflake) ResetID(ThreadID uint32) uint32 {
-	sf.mutex.Lock()
-	defer sf.mutex.Unlock()
+func (sm *Snowmachine) ResetID(ThreadID uint32) uint32 {
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
 
-	originalID := sf.threadID
+	originalID := sm.threadID
 
-	sf.threadID = ThreadID
-	sf.sequence = sequenceMask
-	sf.isExhausted = false
+	sm.threadID = ThreadID
+	sm.sequence = sequenceMask
+	sm.isExhausted = false
 
 	return originalID
 }
 
 // NextID generates the next unique ID.
-func (sf *Snowflake) NextID() (uint64, bool) {
-	sf.mutex.Lock()
-	defer sf.mutex.Unlock()
+func (sm *Snowmachine) NextID() (uint64, bool) {
+	sm.mutex.Lock()
+	defer sm.mutex.Unlock()
 
-	currentTimestamp := currentElapsedTime(sf.epoch)
+	currentTimestamp := currentElapsedTime(sm.epoch)
 
 	// Has the timestamp changed.
-	if currentTimestamp > sf.lastTimestamp {
+	if currentTimestamp > sm.lastTimestamp {
 		// Yes. Roll over to the new timestamp and reset the sequence.
-		sf.lastTimestamp = currentTimestamp
-		sf.sequence = 0
-		sf.isExhausted = false
+		sm.lastTimestamp = currentTimestamp
+		sm.sequence = 0
+		sm.isExhausted = false
 	} else {
 		// No. Increment the sequence counter.
-		sf.sequence = (sf.sequence + 1) & sequenceMask
+		sm.sequence = (sm.sequence + 1) & sequenceMask
 
 		// Check if the counter is now exhausted.
-		if sf.sequence == sequenceMask {
-			sf.isExhausted = true
+		if sm.sequence == sequenceMask {
+			sm.isExhausted = true
 		}
 	}
 
-	id := sf.toID()
+	id := sm.toID()
 
-	return id, sf.isExhausted
+	return id, sm.isExhausted
 }
 
 func toSnowflakeTime(t time.Time) int64 {
@@ -176,10 +176,10 @@ func currentElapsedTime(epoch int64) int64 {
 	return toSnowflakeTime(time.Now()) - epoch
 }
 
-func (sf *Snowflake) toID() uint64 {
-	return uint64(sf.lastTimestamp)<<(threadBitLength+sequenceBitLength) |
-		uint64(sf.sequence)<<threadBitLength |
-		uint64(sf.threadID)
+func (sm *Snowmachine) toID() uint64 {
+	return uint64(sm.lastTimestamp)<<(threadBitLength+sequenceBitLength) |
+		uint64(sm.sequence)<<threadBitLength |
+		uint64(sm.threadID)
 }
 
 func ElapsedTime(id uint64) time.Duration {

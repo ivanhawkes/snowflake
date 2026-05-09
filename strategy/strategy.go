@@ -21,7 +21,7 @@ type StrategyPool struct {
 }
 
 type Strategy struct {
-	snowflake          *snowflake.Snowflake
+	snowmachine        *snowflake.Snowmachine
 	threadID           uint32
 	reserveQueue       reservePoolType
 	exhaustedQueue     reservePoolType
@@ -154,7 +154,7 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32, ZL *za
 
 	// Make a new snowflake to use.
 	sf, err := snowflake.New(Epoch, st.threadID)
-	st.snowflake = sf
+	st.snowmachine = sf
 
 	return st, err
 }
@@ -169,7 +169,7 @@ func (st *Strategy) NextID() uint64 {
 	defer st.mutex.Unlock()
 
 	// Get the next ID available.
-	id, isExhausted := st.snowflake.NextID()
+	id, isExhausted := st.snowmachine.NextID()
 	st.idCount++
 
 	// Recover from exhaustion if possible.
@@ -197,7 +197,7 @@ func (st *Strategy) NextID() uint64 {
 		// We requested a new ID before the timestamp rolled over. We need a
 		// new ThreadID to avoid conflicts.
 		st.reserveQueue, st.threadID = dequeue(st.reserveQueue, st.zl)
-		previousID := st.snowflake.ResetID(st.threadID)
+		previousID := st.snowmachine.ResetID(st.threadID)
 		st.exhaustedTimestamp = snowflake.TimeStamp(id)
 		isExhausted = false
 		st.wasExhausted = true

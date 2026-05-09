@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ivanhawkes/snowflake"
+	"github.com/ivanhawkes/snowflake/snowflake"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +21,7 @@ type StrategyPool struct {
 }
 
 type Strategy struct {
-	snowmachine        *snowflake.Snowmachine
+	snowmachine        *snowflake.Snowflake
 	threadID           uint32
 	reserveQueue       reservePoolType
 	exhaustedQueue     reservePoolType

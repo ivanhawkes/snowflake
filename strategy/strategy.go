@@ -11,17 +11,17 @@ import (
 )
 
 type reservePoolType []uint32
-type strategyPoolListType []*Strategy
+type poolListType []*Strategy
 
-type StrategyPool struct {
-	Pool      strategyPoolListType
+type Pool struct {
+	Pool      poolListType
 	length    uint32
 	poolIndex uint32
 	mutex     sync.Mutex
 }
 
 type Strategy struct {
-	snowmachine        *snowflake.Snowflake
+	snowmachine        *snowflake.SnowMachine
 	threadID           uint32
 	reserveQueue       reservePoolType
 	exhaustedQueue     reservePoolType
@@ -89,11 +89,11 @@ func dequeue(queue []uint32, zl *zap.Logger) ([]uint32, uint32) {
 }
 
 // Create a new pool of strategies which can be used to allocate IDs.
-func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, ReservedPerPool uint32, ZL *zap.Logger) (*StrategyPool, error) {
+func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, ReservedPerPool uint32, ZL *zap.Logger) (*Pool, error) {
 	ZL.Info("Creating a new strategy pool.")
 
 	// Make a new pool and set the index and counter.
-	sp := StrategyPool{}
+	sp := Pool{}
 	sp.poolIndex = EntryCount - 1
 	sp.length = EntryCount
 
@@ -116,7 +116,7 @@ func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, Reser
 
 // Requests the next strategy instance from the pool. These are
 // doled out using a round-robin method.
-func (sp *StrategyPool) Next() *Strategy {
+func (sp *Pool) Next() *Strategy {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -153,8 +153,8 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32, ZL *za
 	st.reserveQueue, st.threadID = dequeue(st.reserveQueue, st.zl)
 
 	// Make a new snowflake to use.
-	sf, err := snowflake.New(Epoch, st.threadID)
-	st.snowmachine = sf
+	sm, err := snowflake.NewMachine(Epoch, st.threadID)
+	st.snowmachine = sm
 
 	return st, err
 }

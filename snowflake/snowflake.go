@@ -78,7 +78,7 @@ type Flake int64
 //	return nil
 //}
 
-type Snowflake struct {
+type SnowMachine struct {
 	// The date from which all timestamp offsets are measured.
 	epoch int64
 
@@ -112,12 +112,12 @@ var (
 // Returns a new Snow machine with values computed from the arguments
 // and it's constant constraints.
 // Errors: Epoch is ahead of the current time.
-func New(Epoch time.Time, ThreadID uint32) (*Snowflake, error) {
+func NewMachine(Epoch time.Time, ThreadID uint32) (*SnowMachine, error) {
 	if Epoch.After(time.Now()) {
 		return nil, ErrEpochAhead
 	}
 
-	sm := new(Snowflake)
+	sm := new(SnowMachine)
 	sm.sequence = sequenceMask
 	sm.isExhausted = false
 
@@ -134,7 +134,7 @@ func New(Epoch time.Time, ThreadID uint32) (*Snowflake, error) {
 
 // This snow machine is being assigned a new ThreadID, possibly due to
 // exhaustion of the sequence.
-func (sm *Snowflake) ResetID(ThreadID uint32) uint32 {
+func (sm *SnowMachine) ResetID(ThreadID uint32) uint32 {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -148,7 +148,7 @@ func (sm *Snowflake) ResetID(ThreadID uint32) uint32 {
 }
 
 // NextID generates the next unique ID.
-func (sm *Snowflake) NextID() (Flake, bool) {
+func (sm *SnowMachine) NextID() (Flake, bool) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -183,7 +183,7 @@ func currentElapsedTime(epoch int64) int64 {
 	return toSnowflakeTime(time.Now()) - epoch
 }
 
-func (sm *Snowflake) toID() Flake {
+func (sm *SnowMachine) toID() Flake {
 	return Flake(sm.lastTimestamp)<<(threadBitLength+sequenceBitLength) |
 		Flake(sm.sequence)<<threadBitLength |
 		Flake(sm.threadID)

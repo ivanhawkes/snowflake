@@ -37,7 +37,7 @@ func (sm *SafeMap) Set(key snowflake.Flake) {
 
 var m SafeMap
 
-func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup, ZL *zap.Logger) {
+func burnID(count int, sp *strategy.Pool, wg *sync.WaitGroup, ZL *zap.Logger) {
 	defer wg.Done()
 
 	for i := 0; i < count; i++ {
@@ -70,6 +70,7 @@ func main() {
 		log.Fatal("Zap logger is not properly initialized.")
 	}
 
+	// TODO: Needs error handling.
 	defer zl.Sync()
 
 	var wg sync.WaitGroup

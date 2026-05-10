@@ -1,7 +1,9 @@
 package snowflake
 
 import (
+	"encoding/json"
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -72,6 +74,32 @@ const (
 )
 
 type Flake int64
+
+func (st *Flake) UnmarshalJSON(b []byte) error {
+	// Convert the bytes into an interface to help us check the type of
+	// our value. If it is a string that can be converted into a Flake
+	// we convert it, otherwise we return an error.
+	var item any
+	if err := json.Unmarshal(b, &item); err != nil {
+		return err
+	}
+	
+	switch v := item.(type) {
+	case int:
+		*st = Flake(v)
+	case float64:
+		*st = Flake(int(v))
+	case string:
+		// Coerce the string into an int64
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return err
+		}
+		*st = Flake(i)
+	}
+
+	return nil
+}
 
 //func (u Flake) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 //	enc.AddInt("id", strconv.FormatInt(u, 10))

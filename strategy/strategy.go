@@ -27,7 +27,7 @@ type Strategy struct {
 	exhaustedQueue     reservePoolType
 	exhaustedMax       int
 	wasExhausted       bool
-	exhaustedTimestamp uint64
+	exhaustedTimestamp snowflake.Flake
 	idCount            uint64
 	zl                 *zap.Logger
 	mutex              sync.Mutex
@@ -52,7 +52,7 @@ func (st *Strategy) GetStatistics() Statistics {
 	return stats
 }
 
-// Print out some of the statistics to the console.
+// Output some of the statistics to the console.
 func (st *Strategy) PrintStatistics() {
 	// Debug.
 	fmt.Printf("EXHAUSTED QUEUE: %d\n", len(st.exhaustedQueue))
@@ -115,12 +115,12 @@ func NewStrategyPool(Epoch time.Time, EntryCount uint32, PoolStart uint32, Reser
 }
 
 // Requests the next strategy instance from the pool. These are
-// doled out using a round robin method.
+// doled out using a round-robin method.
 func (sp *StrategyPool) Next() *Strategy {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
-	// Round robin.
+	// Round-robin.
 	sp.poolIndex++
 	if sp.poolIndex >= sp.length {
 		sp.poolIndex = 0
@@ -160,11 +160,11 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32, ZL *za
 }
 
 // Use a strategy to get a unique identifier. This function is thread-safe.
-func (st *Strategy) NextID() uint64 {
+func (st *Strategy) NextID() snowflake.Flake {
 	// Placing a mutex on this entire function will allow multiple
 	// clients to share the same strategy. You can comment this out
 	// if you're sure each execution thread / goroutine will have
-	// it's own strategy instance.
+	// its own strategy instance.
 	st.mutex.Lock()
 	defer st.mutex.Unlock()
 

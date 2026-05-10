@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
+	"github.com/ivanhawkes/snowflake/snowflake"
 	"github.com/ivanhawkes/snowflake/strategy"
 	"go.uber.org/zap"
 )
 
-type threadIDMapType map[uint64]uint64
+type threadIDMapType map[snowflake.Flake]snowflake.Flake
 
 // Maps are not threadsafe, so you need to surround operations on them
 // with a mutex to avoid concurrency issues.
@@ -18,7 +20,7 @@ type SafeMap struct {
 	m     threadIDMapType
 }
 
-func (sm *SafeMap) Exists(key uint64) bool {
+func (sm *SafeMap) Exists(key snowflake.Flake) bool {
 	sm.mutex.RLock()
 	defer sm.mutex.RUnlock()
 	_, exists := sm.m[key]
@@ -26,7 +28,7 @@ func (sm *SafeMap) Exists(key uint64) bool {
 	return exists
 }
 
-func (sm *SafeMap) Set(key uint64) {
+func (sm *SafeMap) Set(key snowflake.Flake) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -42,7 +44,7 @@ func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup, ZL *zap.Lo
 		// DEBUG: waste some time so we can test the timestamp bucketing.
 		time.Sleep(time.Microsecond * 1)
 
-		// Round robin the strategies.
+		// Round-robin the strategies.
 		st := sp.Next()
 
 		// Get the next snowflake.
@@ -52,7 +54,9 @@ func burnID(count int, sp *strategy.StrategyPool, wg *sync.WaitGroup, ZL *zap.Lo
 		if !m.Exists(id) {
 			m.Set(id)
 		} else {
-			ZL.Fatal("Thread ID already exists.", zap.Uint64("id", id))
+			// TODO: Add the threadId back into the debug message. Need to figure out
+			// how I add a custom type to Zap logging.
+			ZL.Fatal("Thread ID already exists.") //zap.Uint64("id", id)
 		}
 	}
 }
@@ -61,7 +65,11 @@ func main() {
 	start := time.Now()
 
 	// Provide a logging solution.
-	zl, _ := zap.NewProduction()
+	zl, errZl := zap.NewProduction()
+	if (errZl != nil) || (zl == nil) {
+		log.Fatal("Zap logger is not properly initialized.")
+	}
+
 	defer zl.Sync()
 
 	var wg sync.WaitGroup
@@ -93,7 +101,7 @@ func main() {
 	end := time.Now()
 
 	// Print out the statistics for the run.
-	var total int = 0
+	var total = 0
 	for _, st := range sp.Pool {
 		st.PrintStatistics()
 		total += int(st.GetStatistics().IdCount)

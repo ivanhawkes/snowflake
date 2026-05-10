@@ -71,6 +71,13 @@ const (
 	sequenceMask = 1<<sequenceBitLength - 1
 )
 
+type Flake int64
+
+//func (u Flake) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+//	enc.AddInt("id", strconv.FormatInt(u, 10))
+//	return nil
+//}
+
 type Snowflake struct {
 	// The date from which all timestamp offsets are measured.
 	epoch int64
@@ -99,7 +106,7 @@ type Snowflake struct {
 }
 
 var (
-	ErrEpochAhead = errors.New("Epoch is ahead of now ()")
+	ErrEpochAhead = errors.New("epoch is ahead of the present time")
 )
 
 // Returns a new Snow machine with values computed from the arguments
@@ -141,7 +148,7 @@ func (sm *Snowflake) ResetID(ThreadID uint32) uint32 {
 }
 
 // NextID generates the next unique ID.
-func (sm *Snowflake) NextID() (uint64, bool) {
+func (sm *Snowflake) NextID() (Flake, bool) {
 	sm.mutex.Lock()
 	defer sm.mutex.Unlock()
 
@@ -176,28 +183,28 @@ func currentElapsedTime(epoch int64) int64 {
 	return toSnowflakeTime(time.Now()) - epoch
 }
 
-func (sm *Snowflake) toID() uint64 {
-	return uint64(sm.lastTimestamp)<<(threadBitLength+sequenceBitLength) |
-		uint64(sm.sequence)<<threadBitLength |
-		uint64(sm.threadID)
+func (sm *Snowflake) toID() Flake {
+	return Flake(sm.lastTimestamp)<<(threadBitLength+sequenceBitLength) |
+		Flake(sm.sequence)<<threadBitLength |
+		Flake(sm.threadID)
 }
 
-func ElapsedTime(id uint64) time.Duration {
+func ElapsedTime(id Flake) time.Duration {
 	return time.Duration(TimeStamp(id) * timeUnit)
 }
 
-func SequenceNumber(id uint64) uint64 {
-	const mask = uint64(sequenceMask << threadBitLength)
+func SequenceNumber(id Flake) Flake {
+	const mask = Flake(sequenceMask << threadBitLength)
 
 	return id & mask >> threadBitLength
 }
 
-func ThreadID(id uint64) uint64 {
-	const maskThreadID = uint64(1<<threadBitLength - 1)
+func ThreadID(id Flake) Flake {
+	const maskThreadID = Flake(1<<threadBitLength - 1)
 
 	return id & maskThreadID
 }
 
-func TimeStamp(id uint64) uint64 {
+func TimeStamp(id Flake) Flake {
 	return id >> (threadBitLength + sequenceBitLength)
 }

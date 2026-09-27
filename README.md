@@ -16,6 +16,16 @@ It is perfectly capable of creating millions of IDs per second if needed.
 
 ## Quickstart
 
+```bash
+# Devenv - init or run.
+devenv up
+
+# Interactive Devenv shell.
+devenv shell
+```
+
+## Using in your own project
+
 To use snowflake you just need to import the library to your project.
 
 ```bash

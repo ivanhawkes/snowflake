@@ -146,7 +146,7 @@ func NewStrategy(Epoch time.Time, PoolMinimum uint32, PoolMaximum uint32, ZL *za
 
 	// Create a pool of IDS to hold in reserve.
 	for i := PoolMinimum; i <= PoolMaximum; i++ {
-		st.reserveQueue = append(st.reserveQueue, PoolMinimum+i)
+		st.reserveQueue = append(st.reserveQueue, i)
 	}
 
 	// Get an initial threadID.
